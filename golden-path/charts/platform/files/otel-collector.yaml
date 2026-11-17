@@ -1,0 +1,79 @@
+# The platform's OpenTelemetry collector. Every service sends here (the golden-path chart
+# sets OTEL_EXPORTER_OTLP_ENDPOINT), and this is where the cost controls are enforced,
+# so no team can run up the bill by accident. See golden-path/telemetry/STANDARD.md.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:            # protect the collector itself under a flood
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Cost control 1, labels: keep only the attributes on the allowlist. Every new label
+  # value multiplies the number of series, and series are what we pay for.
+  transform/allowlist:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "error.type", "dependency", "outcome"])
+
+  # Cost control 2, metrics nobody reads: the body-size histograms OpenTelemetry's HTTP
+  # instrumentation adds by itself. No SLI or alert uses them, and they were half of
+  # order-validation's series (320 of 649).
+  filter/unused:
+    error_mode: ignore
+    metrics:
+      metric:
+        - IsMatch(name, "^http\\.(server|client)\\.(request|response)\\.body\\.size$")
+
+  # Cost control 3, health checks: never kept, even if a service forgets to exclude them.
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - IsMatch(attributes["http.route"], "^/(healthz|readyz)$")
+
+  # Cost control 4, traces: keep every error and every slow request (the ones anyone
+  # will look at), and only a sample of the rest. TRACE_SAMPLE_PERCENT: traces.samplePercent in values.yaml.
+  tail_sampling:
+    decision_wait: 5s
+    policies:
+      - name: errors
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      - name: slower-than-the-slo
+        type: latency
+        latency: {threshold_ms: 250}
+      - name: some-of-the-rest
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:TRACE_SAMPLE_PERCENT:-5}
+
+  batch: {}
+
+exporters:
+  prometheus:                # Prometheus scrapes metrics from here
+    endpoint: 0.0.0.0:8889
+  otlp_grpc/jaeger:          # traces go to Jaeger
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/unused, transform/allowlist, batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/health, tail_sampling, batch]
+      exporters: [otlp_grpc/jaeger]

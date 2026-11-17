@@ -1,0 +1,22 @@
+# The platform's observability stack, installed once per cluster:
+#   helm install platform golden-path/charts/platform -n platform --create-namespace --wait
+# Small and in memory: data is not kept across restarts. That's fine locally, and it gives
+# every incident drill a clean start. In production the same collector config sends to the
+# platform's hosted backends.
+
+traces:
+  samplePercent: 100   # share of ordinary traces kept; errors and slow ones are always kept.
+                       # 100 locally to see everything; 5 in production (traces are billed by volume).
+
+prometheus:
+  retention: 2d        # locally. In production: 15 days of raw data, 28+ days of the SLO recording rules.
+
+jaeger:
+  maxTraces: 20000     # traces kept in memory. Without a cap it ran out of memory in the incident drill.
+
+images:
+  collector: otel/opentelemetry-collector-contrib:0.164.0
+  prometheus: prom/prometheus:v3.15.1
+  rulesCollector: kiwigrid/k8s-sidecar:2.14.1   # copies every service's SLO rules ConfigMap into Prometheus
+  alertmanager: prom/alertmanager:v0.34.2
+  jaeger: jaegertracing/jaeger:2.22.0

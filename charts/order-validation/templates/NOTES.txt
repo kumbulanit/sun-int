@@ -1,6 +1,7 @@
-order-validation {{ include "order-validation.tag" . }} is installed in {{ .Release.Namespace }}
+order-validation {{ include "golden-path.tag" . }} is installed in {{ .Release.Namespace }}
 {{- if index .Values "pricing-fake" "enabled" }}, with pricing-fake{{ end }}
 {{- if .Values.postgres.enabled }} and postgres{{ end }}.
+Its SLO alerts are loaded into the platform's Prometheus, and its telemetry goes to the platform's collector.
 
 Run all 40 tests in the cluster:
   helm test {{ .Release.Name }} -n {{ .Release.Namespace }} --logs

@@ -18,7 +18,7 @@ async def create_pool(dsn: str, size: int, statement_timeout_ms: int) -> asyncpg
     """Open a small, fixed-size connection pool.
 
     At 600 req/s with ~2 ms queries only ~1.2 connections are busy
-    (docs/budget-math.md), so 10 is plenty; a bigger pool would only hide
+    (Little's law: golden-path/tools/slo_math.py), so 10 is plenty; a bigger pool would only hide
     problems. statement_timeout makes Postgres itself cancel any slower query,
     so one stuck query can't hold a connection, or our 250 ms budget, for long.
     """

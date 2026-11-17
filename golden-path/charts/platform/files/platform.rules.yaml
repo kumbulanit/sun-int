@@ -1,0 +1,15 @@
+# Platform rules, the same for every service. (Each service's SLO rules arrive from
+# its own chart, through the rules collector.)
+groups:
+  - name: platform
+    rules:
+      # Cost control: each service gets 2,000 active series. Going over is almost
+      # always a label with unbounded values (IDs, URLs), which multiplies the bill.
+      - alert: ServiceOverSeriesBudget
+        expr: count by (job) ({job!="", job!="otel-collector"}) > 2000
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "{{ $labels.job }} has {{ $value }} active series (budget 2,000)"
+          description: "Usually a label with unbounded values. Find it with: golden-path/tools/prom.sh series {{ $labels.job }}"

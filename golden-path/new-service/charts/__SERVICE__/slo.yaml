@@ -1,0 +1,15 @@
+# __SERVICE__'s SLO: what "working" means for its users. After any change, run
+#   golden-path/slo/generate.sh charts/__SERVICE__
+# and commit both files. Pick the numbers with golden-path/tools/slo_math.py; these are a first guess.
+service: __SERVICE__                # your chart's name (it's also your OTEL_SERVICE_NAME)
+team: __TEAM__                      # who gets paged
+route: /hello                       # the endpoint your users care about, as http.route
+objective: 99.9                     # % of requests that must be good, where good = not a 5xx...
+latency_threshold: 0.5              # ...and answered within this many seconds. Must be a standard
+                                    #    bucket edge: 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5 ...
+window: 28d                         # rolling window
+runbook: services/__SERVICE__/runbooks/slo-burn.md   # where the page links to
+
+# dependencies:                     # optional: a ticket (never a page) when calls to one fail
+#   - name: payments                # the `dependency` you count in dependency.calls
+#     failure_ratio_warn: 0.05      # more than 5% of calls failing or timing out, over 10 minutes

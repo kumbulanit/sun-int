@@ -13,7 +13,7 @@ import httpx
 from opentelemetry import metrics
 
 # The telemetry standard: count every call to a dependency by outcome. The golden
-# path's dependency alert (share of calls failing or timing out, D22) is built on it.
+# path's dependency alert (share of calls failing or timing out) is built on it.
 _calls = metrics.get_meter("order-validation").create_counter(
     "dependency.calls", unit="{call}", description="Calls to dependencies, by outcome")
 

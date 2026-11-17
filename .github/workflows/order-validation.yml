@@ -1,0 +1,26 @@
+# order-validation's pipeline: the golden path does everything (golden-path/README.md, "Your pipeline").
+name: order-validation
+
+on:
+  push:
+    branches: [main]
+    paths: ["services/order-validation/**", "charts/order-validation/**", "charts/pricing-fake/**", "charts/postgres/**", "golden-path/**"]
+  pull_request:
+    paths: ["services/order-validation/**", "charts/order-validation/**", "charts/pricing-fake/**", "charts/postgres/**", "golden-path/**"]
+  workflow_dispatch:
+    inputs:
+      release-labels:
+        description: first-deploy, rollback, reliability-fix or budget-exception, when the release rules need one
+        default: ""
+
+jobs:
+  golden-path:
+    uses: ./.github/workflows/golden-path.yml
+    with:
+      service: order-validation
+      tests-target: test   # also publishes order-validation-tests, which `helm test` runs
+      release-labels: ${{ inputs.release-labels || '' }}
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit

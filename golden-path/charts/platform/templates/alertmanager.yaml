@@ -1,0 +1,69 @@
+{{- /* Where alerts go: pages wake the team's on-call, tickets go to its queue. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+data:
+  alertmanager.yml: |
+    {{- .Files.Get "files/alertmanager.yml" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    app.kubernetes.io/name: alertmanager
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: alertmanager}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager
+        {{- include "platform.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Files.Get "files/alertmanager.yml" | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "platform.podSecurity" . | nindent 8 }}
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: alertmanager
+          image: {{ .Values.images.alertmanager }}
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+          ports:
+            - {name: web, containerPort: 9093}
+          readinessProbe:
+            httpGet: {path: /-/ready, port: web}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            {{- include "platform.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/alertmanager}
+            - {name: data, mountPath: /alertmanager}
+      volumes:
+        - name: config
+          configMap: {name: alertmanager}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  selector: {app.kubernetes.io/name: alertmanager}
+  ports:
+    - {name: web, port: 9093, targetPort: web}

@@ -1,0 +1,53 @@
+{{- /* Jaeger all-in-one: receives traces from the collector, keeps them in memory, serves the UI. */}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  labels:
+    app.kubernetes.io/name: jaeger
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: jaeger}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jaeger
+        {{- include "platform.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "platform.podSecurity" . | nindent 8 }}
+      containers:
+        - name: jaeger
+          image: {{ .Values.images.jaeger }}
+          args:
+            - --set=extensions.jaeger_storage.backends.some_storage.memory.max_traces={{ .Values.jaeger.maxTraces }}
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: ui, containerPort: 16686}
+          readinessProbe:
+            httpGet: {path: /, port: ui}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          securityContext:
+            {{- include "platform.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  selector: {app.kubernetes.io/name: jaeger}
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: otlp-grpc}
+    - {name: ui, port: 16686, targetPort: ui}

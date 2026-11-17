@@ -4,7 +4,7 @@
 |---|---|
 | **Service / team** | order-validation / Storefront |
 | **Alerts that link here** | `DependencyFailing` (ticket) when pricing struggles; `SLOFastBurn`, `SLOSlowBurn` (page) when customers feel it |
-| **Where to look** | Prometheus http://127.0.0.1:9090 · Jaeger http://127.0.0.1:16686, service `order-validation` · `make logs` |
+| **Where to look** | Prometheus http://127.0.0.1:9090 · Jaeger http://127.0.0.1:16686, service `order-validation` (open both with `scripts/ui.sh`) · `kubectl -n order-validation logs deploy/order-validation` |
 | **Escalate to** | the pricing team's on-call (they own the cause); the Storefront lead if the page fires during the Saturday sale |
 
 ## What it means
@@ -18,14 +18,14 @@ Pricing answers slowly or not at all. We give up on a pricing call after **150 m
 - **Cost:** 20% of requests failing for 5 minutes spends 4.8% of the 28-day budget at 40 req/s, and **72% during the flash sale**.
 
 ## Check (first 5 minutes)
-1. **Is it pricing?** `golden-path/tools/prom.sh query 'dependency:failure_ratio:rate10m{service="order-validation"}'`. Above 0.05 means yes. Near 0 means this is **not** this failure: look for `catalogue unavailable` in `make logs` (the database).
+1. **Is it pricing?** `golden-path/tools/prom.sh query 'dependency:failure_ratio:rate10m{service="order-validation"}'`. Above 0.05 means yes. Near 0 means this is **not** this failure: look for `catalogue unavailable` in `kubectl -n order-validation logs deploy/order-validation` (the database).
 2. **Are customers getting errors?** `golden-path/tools/prom.sh query 'sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{job="order-validation"}[5m]))'`. Any `503` is bad.
-3. **Is the fallback switched on?** `kubectl get deploy order-validation -o yaml | grep -A1 PRICING_FALLBACK_ENABLED`. It must be `"true"`.
-4. **Is the cache still being refreshed?** `price refresh failed` in `make logs` every 30 s means pricing is failing even with a 2 s deadline. Cached prices expire 60 s after the last success, then 503s start.
+3. **Is the fallback switched on?** `kubectl -n order-validation get deploy order-validation -o yaml | grep -A1 PRICING_FALLBACK_ENABLED`. It must be `"true"`.
+4. **Is the cache still being refreshed?** `price refresh failed` in `kubectl -n order-validation logs deploy/order-validation` every 30 s means pricing is failing even with a 2 s deadline. Cached prices expire 60 s after the last success, then 503s start.
 5. **How slow is pricing?** In Jaeger, the `POST` span to pricing in a slow trace: about 150 ms with an error means our deadline cut it off.
 
 ## Mitigate (stop the harm, no code change)
-1. **Fallback switched off?** Switch it on: change `PRICING_FALLBACK_ENABLED` to `"true"` in `deploy/values.yaml` and deploy with the label `reliability-fix` (locally: `make deploy PRICING_FALLBACK_ENABLED=true`). **Worked if:** answers show `"price_source": "cache"`, 503s stop, and the page clears within about 5 minutes.
+1. **Fallback switched off?** Switch it on: change `PRICING_FALLBACK_ENABLED` to `"true"` under `env` in `charts/order-validation/values.yaml` and deploy with the label `reliability-fix` (locally: `helm upgrade order-validation charts/order-validation -n order-validation --reuse-values --set-string env.PRICING_FALLBACK_ENABLED=true --wait`). **Worked if:** answers show `"price_source": "cache"`, 503s stop, and the page clears within about 5 minutes.
 2. **Pricing down for over a minute (503s because the cache is too old)?** Page the pricing team now. Only if the product owner agrees to older prices (checkout re-prices; assumption 3), raise `PRICING_CACHE_TTL_S` (e.g. to `300`), and **never around 15:00 on Saturday**, when sale prices start. **Worked if:** 503s stop.
 3. **During the flash sale:** tell the Storefront lead. Every minute at 600 req/s costs about 7× the budget of a normal minute.
 

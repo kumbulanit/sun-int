@@ -1,0 +1,8 @@
+apiVersion: v2
+name: golden-path
+description: >-
+  The golden path for running a service. A library chart: a team's chart depends on it and
+  includes it in one line, and gets the Deployment, Service, PodDisruptionBudget, telemetry
+  settings, locked-down security and its SLO alerts, all the platform's way.
+type: library
+version: 0.1.0   # bump it whenever these templates change; teams pick it up by bumping their dependency

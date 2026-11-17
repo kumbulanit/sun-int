@@ -1,0 +1,100 @@
+# The golden-path pipeline. Teams don't copy it: each service calls it in about 15 lines
+# (new-service.sh writes that file). Every check is a script that also runs on a laptop.
+#
+#   checks   every push and pull request: golden-path/pipeline/checks.sh (SLO, chart, policy,
+#            unit tests, vulnerability scan)
+#   publish  main only: the image (and its test image) for Intel/AMD and Apple silicon, as the
+#            chart's appVersion; a published version is never overwritten
+#   deploy   main only, and only once the repository has a KUBECONFIG secret: the release rules
+#            (error budget left, not in the Saturday freeze), then a rollout watched for 5 minutes
+#            that rolls itself back if the SLO's fast-burn page fires. The `production`
+#            environment can require an approval first (repository settings).
+name: golden-path
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: the service's name (its chart is charts/<service>, its code services/<service>)
+        type: string
+        required: true
+      tests-target:
+        description: a Dockerfile stage to publish as <image>-tests too, for helm test (e.g. test)
+        type: string
+        default: ""
+      release-labels:
+        description: first-deploy, rollback, reliability-fix or budget-exception, comma-separated, when the release rules need one
+        type: string
+        default: ""
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: All checks (golden-path/pipeline/checks.sh)
+        run: golden-path/pipeline/checks.sh "${{ inputs.service }}"
+
+  publish:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write   # publish with the workflow's own token: no personal token needed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v3      # to build the arm64 image too
+      - uses: docker/setup-buildx-action@v3
+      - name: Publish the image as the chart's appVersion
+        env:
+          SERVICE: ${{ inputs.service }}
+          TESTS_TARGET: ${{ inputs.tests-target }}
+          SOURCE_URL: https://github.com/${{ github.repository }}   # links the image to this repository
+        run: |
+          image=$(grep -A3 '^image:' "charts/$SERVICE/values.yaml" | awk '/repository:/ {print $2; exit}')
+          version=$(awk '/^appVersion:/ {gsub(/"/, "", $2); print $2}' "charts/$SERVICE/Chart.yaml")
+          golden-path/pipeline/publish.sh "$image" "$version" "services/$SERVICE"
+          if [ -n "$TESTS_TARGET" ]; then
+            golden-path/pipeline/publish.sh "$image-tests" "$version" "services/$SERVICE" "$TESTS_TARGET"
+          fi
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+    steps:
+      - name: Is there a cluster to deploy to?
+        id: cluster
+        run: |
+          if [ -z "$KUBECONFIG_DATA" ]; then
+            echo "::notice::No KUBECONFIG secret in this repository, so nothing is deployed. Add one to switch deploys on."
+          else
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cluster.outputs.yes
+      - name: Connect to the cluster
+        if: steps.cluster.outputs.yes
+        run: |
+          mkdir -p ~/.kube && printf '%s' "$KUBECONFIG_DATA" > ~/.kube/config && chmod 600 ~/.kube/config
+      - name: Release rules (error budget left; not in the Saturday 13:00-17:00 freeze)
+        if: steps.cluster.outputs.yes
+        env:
+          SERVICE: ${{ inputs.service }}
+          LABELS: ${{ inputs.release-labels }}
+        run: |
+          golden-path/pipeline/release-facts.sh "$SERVICE" "$LABELS" > release.json
+          cat release.json
+          docker run --rm -v "$PWD:/work" -w /work openpolicyagent/conftest:v0.71.1 \
+            test release.json --policy golden-path/pipeline/policy --namespace release
+      - name: Roll out, watch the SLO for 5 minutes, roll back if it burns
+        if: steps.cluster.outputs.yes
+        run: golden-path/pipeline/deploy.sh "${{ inputs.service }}"

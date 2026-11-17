@@ -1,0 +1,65 @@
+# Unit tests for the rules generated from slo.yaml in this folder (golden-path/slo/test.sh):
+# a healthy service stays quiet, a fast burn pages, a failing dependency tickets.
+# Traffic is 10 req/s (600 a minute); "a+bxn" means start at a, add b per minute, n times.
+rule_files:
+  - slo-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  - name: a healthy service stays quiet, with all of its budget left
+    interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="example-service", http_route="/api/things", le="0.5", http_response_status_code="200"}'
+        values: '0+600x180'
+      - series: 'http_server_request_duration_seconds_count{job="example-service", http_route="/api/things", http_response_status_code="200"}'
+        values: '0+600x180'
+      - series: 'dependency_calls_total{job="example-service", dependency="payments", outcome="ok"}'
+        values: '0+600x180'
+    alert_rule_test:
+      - {eval_time: 170m, alertname: SLOFastBurn, exp_alerts: []}
+      - {eval_time: 170m, alertname: SLOSlowBurn, exp_alerts: []}
+      - {eval_time: 170m, alertname: SLOBudgetLeak, exp_alerts: []}
+      - {eval_time: 170m, alertname: DependencyFailing, exp_alerts: []}
+    promql_expr_test:
+      - expr: slo:error_budget_remaining
+        eval_time: 170m
+        exp_samples:
+          - labels: 'slo:error_budget_remaining{service="example-service"}'
+            value: 1
+
+  - name: from minute 60, 20% of requests fail -> the fast-burn page fires within minutes
+    interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="example-service", http_route="/api/things", le="0.5", http_response_status_code="200"}'
+        values: '0+600x59 36000+480x30'
+      - series: 'http_server_request_duration_seconds_count{job="example-service", http_route="/api/things", http_response_status_code="200"}'
+        values: '0+600x59 36000+480x30'
+      - series: 'http_server_request_duration_seconds_bucket{job="example-service", http_route="/api/things", le="0.5", http_response_status_code="503"}'
+        values: '0x59 0+120x30'
+      - series: 'http_server_request_duration_seconds_count{job="example-service", http_route="/api/things", http_response_status_code="503"}'
+        values: '0x59 0+120x30'
+    alert_rule_test:
+      - {eval_time: 58m, alertname: SLOFastBurn, exp_alerts: []}
+      - eval_time: 70m
+        alertname: SLOFastBurn
+        exp_alerts:
+          - exp_labels: {severity: page, service: example-service, team: example-team}
+            exp_annotations:
+              summary: "example-service: at this rate 2% of the 28d error budget goes in 1h"
+              runbook_url: services/example-service/runbooks/slo-burn.md
+
+  - name: from minute 60, 20% of calls to a dependency time out -> a ticket, not a page
+    interval: 1m
+    input_series:
+      - series: 'dependency_calls_total{job="example-service", dependency="payments", outcome="ok"}'
+        values: '0+600x59 36000+480x30'
+      - series: 'dependency_calls_total{job="example-service", dependency="payments", outcome="timeout"}'
+        values: '0x59 0+120x30'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: DependencyFailing
+        exp_alerts:
+          - exp_labels: {severity: ticket, service: example-service, team: example-team, dependency: payments}
+            exp_annotations:
+              summary: "example-service: more than 5% of calls to payments are failing or timing out"
+              runbook_url: services/example-service/runbooks/slo-burn.md

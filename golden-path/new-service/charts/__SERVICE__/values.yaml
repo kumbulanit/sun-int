@@ -1,0 +1,25 @@
+# __SERVICE__ on the golden path. Every setting is explained in golden-path/README.md
+# ("Your chart's values"); the platform's defaults cover everything not listed here.
+
+team: __TEAM__
+
+image:
+  repository: __REGISTRY__/__SERVICE__   # published by .github/workflows/__SERVICE__.yml
+  tag: ""                                 # empty = the chart's appVersion
+
+replicas: 2   # at least 2, so one pod can restart without an outage
+port: 8080
+
+env:
+  LOG_LEVEL: INFO
+  # Python telemetry settings (golden-path/telemetry/STANDARD.md; other languages: see there)
+  OTEL_SEMCONV_STABILITY_OPT_IN: http                # the standard HTTP metric names, in seconds
+  OTEL_PYTHON_LOG_CORRELATION: "true"                # trace_id on log lines
+  OTEL_PYTHON_EXCLUDED_URLS: "healthz,readyz"        # no telemetry for health checks (cost)
+  OTEL_PYTHON_FASTAPI_EXCLUDE_SPANS: "receive,send"  # skip tiny internal spans nobody reads (cost)
+secretEnv: {}   # from a Secret, e.g. {DATABASE_URL: {secret: __SERVICE__, key: DATABASE_URL}}
+waitFor: []     # what the app can't start without, e.g. [{name: database, host: postgres, port: 5432}]
+
+resources:      # what the cluster reserves for each pod (and what you pay for), and a memory cap
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 256Mi}   # no CPU limit: it would slow the app down exactly when it's busiest

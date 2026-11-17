@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: The order validation database for trying the service out. Postgres, with the product catalogue and order limits loaded on its first start. Production uses a managed database instead.
+type: application
+version: 0.1.1        # this chart's version: bump it when the chart changes
+appVersion: "18.7"    # the Postgres version

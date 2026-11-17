@@ -1,22 +1,44 @@
-# The order validation API. Installing it also installs its two dependencies
-# (Chart.yaml): the pricing service and the database.
+# The order validation API, on the golden path (golden-path/README.md). The golden-path chart
+# makes the Deployment, Service, PDB, telemetry settings and SLO alerts from these values;
+# this chart adds only its own Secret and its tests.
+
+team: storefront
 
 image:
-  repository: ghcr.io/kumbulanit/order-validation   # built and published by .github/workflows/images.yml
+  repository: ghcr.io/kumbulanit/order-validation   # published by .github/workflows/order-validation.yml
   tag: ""                                            # empty = the chart's appVersion
-  pullPolicy: IfNotPresent
 
-replicas: 2   # at least 2, so one pod can restart without an outage. Raise it before the Saturday sale.
+replicas: 2   # one pod handles about 250 req/s: raise to 6 before the Saturday sale
+port: 8080
 
-# Where its dependencies are. The defaults are the two charts installed with it.
+env:
+  PRICING_URL: http://pricing-fake:8081
+  PRICING_FALLBACK_ENABLED: "true"   # when pricing is slow, answer from prices fetched in the last 60 s
+  LOG_LEVEL: INFO
+  # Python telemetry settings (golden-path/telemetry/STANDARD.md)
+  OTEL_SEMCONV_STABILITY_OPT_IN: http                # the standard HTTP metric names, in seconds
+  OTEL_PYTHON_LOG_CORRELATION: "true"                # trace_id on log lines
+  OTEL_PYTHON_EXCLUDED_URLS: "healthz,readyz"        # no telemetry for health checks
+  OTEL_PYTHON_FASTAPI_EXCLUDE_SPANS: "receive,send"  # skip tiny internal spans nobody reads (cost)
+secretEnv:
+  DATABASE_URL: {secret: order-validation, key: DATABASE_URL}
+  PRICING_TOKEN: {secret: order-validation, key: PRICING_TOKEN}
+
+# The API can't start without its database, so it waits for it. Not for pricing, on
+# purpose: if pricing is down, the API must still start (and fill its cache once it's back).
+waitFor:
+  - {name: database, host: postgres, port: 5432}
+
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 256Mi}   # no CPU limit: it would slow the app down exactly when it's busiest
+
+# Where the database is, for the DATABASE_URL secret (templates/secret.yaml). Change waitFor with it.
 database:
   host: postgres
   port: 5432
   name: order_validation
   user: order_validation
-pricing:
-  url: http://pricing-fake:8081
-  fallbackEnabled: true   # when pricing is slow, answer from prices fetched in the last 60 s
 
 # Shared with the two dependencies, so both ends always match. Local-only values: on a
 # real cluster set your own, e.g. --set global.postgresPassword=... --set global.pricingToken=...
@@ -24,18 +46,11 @@ global:
   postgresPassword: local-dev-only
   pricingToken: local-dev-token
 
-# The dependencies. false = bring your own, and point database/pricing above at it.
+# The dependencies (Chart.yaml). false = bring your own, and point env/database above at it.
 pricing-fake:
   enabled: true
 postgres:
   enabled: true
-
-logLevel: INFO
-extraEnv: {}   # any other setting from app/settings.py, e.g. {PRICING_CACHE_TTL_S: "300"}
-
-resources:
-  requests: {cpu: 100m, memory: 128Mi}
-  limits: {memory: 256Mi}   # no CPU limit: it would slow the app down exactly when it's busiest
 
 # `helm test`: the 40 tests, run as a pod in the cluster. Same tag as the API.
 tests:

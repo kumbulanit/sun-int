@@ -1,18 +1,23 @@
 apiVersion: v2
 name: order-validation
-description: The order validation API (POST /orders/validate). Its pricing service and database are dependencies, so one install brings up all three.
+description: The order validation API (POST /orders/validate), on the golden path. Its pricing service and database are dependencies, so one install brings up all three.
 type: application
-version: 0.1.0        # this chart's version: bump it when the chart changes
+version: 0.2.0        # this chart's version: bump it when the chart changes
 appVersion: "0.1.0"   # the image version: bump it when services/order-validation changes, and CI publishes it
 
-# Installed with this chart. They live in charts/ inside this chart, so a plain
-# `helm install` brings them along: nothing to download first. Switch one off to bring
-# your own, e.g. a managed database:
-#   --set postgres.enabled=false --set database.host=mydb.example.com
+# `helm install --dependency-update` fetches these from the folders named here.
 dependencies:
-  - name: pricing-fake
+  # The golden path: the Deployment, Service, PDB, telemetry and SLO alerts (templates/service.yaml).
+  - name: golden-path
     version: 0.1.0
+    repository: file://../../golden-path/charts/service
+  # What the API needs, installed with it. Switch one off to bring your own, e.g. a
+  # managed database: --set postgres.enabled=false --set database.host=mydb.example.com
+  - name: pricing-fake
+    version: 0.1.1
+    repository: file://../pricing-fake
     condition: pricing-fake.enabled
   - name: postgres
-    version: 0.1.0
+    version: 0.1.1
+    repository: file://../postgres
     condition: postgres.enabled

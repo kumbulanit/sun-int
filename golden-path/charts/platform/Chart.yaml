@@ -1,0 +1,8 @@
+apiVersion: v2
+name: platform
+description: >-
+  The platform's observability stack, installed once per cluster: the OpenTelemetry collector
+  (where the cost controls are), Prometheus (metrics, every service's SLO rules, alerts),
+  Alertmanager (pages and tickets) and Jaeger (traces).
+type: application
+version: 0.1.0   # bump it whenever the chart changes

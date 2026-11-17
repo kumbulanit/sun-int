@@ -1,0 +1,13 @@
+# The order validation SLO. After any change: golden-path/slo/generate.sh charts/order-validation
+service: order-validation
+team: storefront
+route: /orders/validate
+objective: 99.95                    # 1 in 2,000 validations may fail or be slow...
+latency_threshold: 0.25             # ...where slow = over 250 ms
+window: 28d
+runbook: services/order-validation/runbooks/pricing-slow.md
+
+dependencies:
+  - name: pricing
+    failure_ratio_warn: 0.05        # timeouts count too: our 150 ms deadline caps the latency we see
+    runbook: services/order-validation/runbooks/pricing-slow.md

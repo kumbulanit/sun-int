@@ -1,0 +1,14 @@
+# One file per service, in its chart: everything the golden path needs to build its SLO and alerts.
+# After a change, run golden-path/slo/generate.sh charts/<your-service>.
+service: example-service            # your chart's name (it's also your OTEL_SERVICE_NAME)
+team: example-team                  # who gets paged
+route: /api/things                  # the endpoint your users care about, as http.route
+objective: 99.9                     # % of requests that must be good, where good = not a 5xx...
+latency_threshold: 0.5              # ...and answered within this many seconds. Must be a standard
+                                    #    bucket edge: 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5 ...
+window: 28d                         # rolling window
+runbook: services/example-service/runbooks/slo-burn.md   # where the page links to
+
+dependencies:                       # optional: a ticket (never a page) when calls to a dependency fail
+  - name: payments                  # the `dependency` you count in dependency.calls
+    failure_ratio_warn: 0.05        # more than 5% of calls failing or timing out, over 10 minutes

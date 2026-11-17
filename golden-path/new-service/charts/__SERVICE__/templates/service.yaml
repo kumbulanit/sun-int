@@ -1,0 +1,2 @@
+{{- /* Everything the golden path gives a service: Deployment, Service, PDB, telemetry, SLO alerts. */}}
+{{ include "golden-path.service" . }}

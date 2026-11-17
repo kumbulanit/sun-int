@@ -1,0 +1,21 @@
+# The platform's Prometheus: scrape the collector (every service's metrics arrive
+# there), load the platform's rules and every service's SLO rules, send alerts to
+# Alertmanager. Services need no scrape config of their own.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: otel-collector
+    honor_labels: true       # keep each service's own job (service name) and instance (pod)
+    static_configs:
+      - targets: [otel-collector:8889]
+
+rule_files:
+  - /etc/prometheus/rules/platform/*.yaml
+  - /etc/prometheus/rules/services/*.yaml   # written by the rules collector, from each service's chart
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]

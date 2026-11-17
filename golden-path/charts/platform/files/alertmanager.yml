@@ -1,0 +1,13 @@
+# Where alerts go. Pages wake the team's on-call; tickets go to its queue for
+# working hours. Locally both are only shown in the Alertmanager UI; in production
+# each receiver gets the team's PagerDuty / ticketing integration.
+route:
+  receiver: ticket
+  group_by: [alertname, service]
+  routes:
+    - matchers: [severity="page"]
+      receiver: page
+
+receivers:
+  - name: page
+  - name: ticket
