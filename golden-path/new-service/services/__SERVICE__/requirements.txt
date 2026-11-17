@@ -1,7 +1,0 @@
-# Exact versions, so every build is the same (the same ones order-validation uses).
-fastapi==0.162.0
-uvicorn==0.54.0
-# Telemetry (golden-path/telemetry/STANDARD.md): auto-instrumentation, so no telemetry code.
-opentelemetry-distro==0.66b2                     # the opentelemetry-instrument launcher and the SDK
-opentelemetry-exporter-otlp-proto-http==1.45.2   # sends metrics and traces to the platform's collector
-opentelemetry-instrumentation-fastapi==0.66b2    # incoming requests: your SLI is measured here

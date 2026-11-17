@@ -1,59 +1,61 @@
 #!/usr/bin/env bash
-# Start a new service on the golden path. Creates, ready to deploy:
-#   services/<name>/                 a starter app (Python, FastAPI, telemetry wired in) and its
-#                                    Dockerfile. Replace it with your own code; keep /healthz,
-#                                    /readyz and the telemetry launcher.
-#   services/<name>/runbooks/        the runbook its alerts link to (from golden-path/runbook/TEMPLATE.md)
-#   charts/<name>/                   its chart: the golden path in one line, its values, its SLO
-#   .github/workflows/<name>.yml     its pipeline: the golden-path workflow
+# Start a new service on the golden path. It does the by-hand steps of golden-path/new-service/README.md
+# for you: copies golden-path/new-service/ (a working example service) and changes its three
+# example values to yours: example-service (the name), example-team, example-org (the registry).
 #
-# Usage: golden-path/new-service.sh <name> --team <team> [--registry ghcr.io/<owner>]
-#   The registry defaults to ghcr.io/<owner of this repository on GitHub>.
+#   golden-path/new-service.sh                                 it asks for the name and team
+#   golden-path/new-service.sh payments --team checkout        or give them straight away
+#   ... [--registry ghcr.io/<owner>]                           default: this repository's GitHub owner
 set -euo pipefail
 cd "$(dirname "$0")/.."
 die() { echo "error: $*" >&2; exit 1; }
+ask() { local answer; read -r -p "$1" answer || true; echo "$answer"; }   # empty if there's no one to ask
 
-name=${1:-}; [ $# -gt 0 ] && shift
-team=""; registry=""
+name=""; team=""; registry=""
+[ $# -gt 0 ] && [ "${1#-}" = "$1" ] && { name=$1; shift; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --team) team=${2:-}; shift 2 ;;
     --registry) registry=${2:-}; shift 2 ;;
-    *) die "unknown option $1" ;;
+    *) die "unknown option $1 (usage: golden-path/new-service.sh [<name> --team <team>])" ;;
   esac
 done
+
 valid='^[a-z][a-z0-9-]{0,38}[a-z0-9]$'   # a Kubernetes name: lower case, digits and dashes
-[[ $name =~ $valid ]] || die "usage: golden-path/new-service.sh <name> --team <team>   (name: lower case, digits, dashes)"
-[[ $team =~ $valid ]] || die "--team is required: the owning team, lower case, e.g. checkout"
+[ -n "$name" ] || name=$(ask "Service name (lower case, e.g. payments): ")
+[[ $name =~ $valid ]] || die "the service name must be lower case letters, digits and dashes, e.g. payments"
 [ ! -e "charts/$name" ] && [ ! -e "services/$name" ] || die "charts/$name or services/$name already exists"
+[ -n "$team" ] || team=$(ask "Owning team (lower case, e.g. checkout): ")
+[[ $team =~ $valid ]] || die "the team must be lower case letters, digits and dashes, e.g. checkout"
 if [ -z "$registry" ]; then
   owner=$(git remote get-url origin 2>/dev/null | sed -nE 's#.*github\.com[:/]([^/]+)/.*#\1#p' | tr '[:upper:]' '[:lower:]')
-  [ -n "$owner" ] || die "can't tell the registry from the git remote: pass --registry ghcr.io/<owner>"
-  registry="ghcr.io/$owner"
+  [ -n "$owner" ] && registry="ghcr.io/$owner" || registry=$(ask "Image registry (e.g. ghcr.io/myorg): ")
+  [ -n "$registry" ] || die "no registry: pass --registry ghcr.io/<owner>"
 fi
 
-# Copy the template, filling in the name, team and registry.
-template=golden-path/new-service
-(cd "$template" && find . -type f) | sort | while read -r file; do
-  dest=${file#./}; dest=${dest//__SERVICE__/$name}
+# The by-hand steps: copy the example, then change the names (and drop the "# CHANGE:" notes).
+example=golden-path/new-service   # a working example; the three example-* values are what change
+(cd "$example" && find services charts workflows -type f) | while read -r file; do
+  dest=${file//example-service/$name}
+  [[ $dest == workflows/* ]] && dest=".github/$dest"
   mkdir -p "$(dirname "$dest")"
-  sed -e "s/__SERVICE__/$name/g" -e "s/__TEAM__/$team/g" -e "s|__REGISTRY__|$registry|g" "$template/$file" > "$dest"
-  echo "created $dest"
+  sed -e "s|ghcr.io/example-org|$registry|g" -e "s/example-service/$name/g" -e "s/example-team/$team/g" \
+      -e '/^ *# CHANGE:/d' -e 's/ *# CHANGE:.*$//' "$example/$file" > "$dest"
 done
-mkdir -p "services/$name/runbooks"
-sed -e "s/<service>/$name/g" -e "s/<one failure>/the SLO is burning/" golden-path/runbook/TEMPLATE.md > "services/$name/runbooks/slo-burn.md"
-echo "created services/$name/runbooks/slo-burn.md"
-
-# Its SLO alerts, from the starter slo.yaml.
-golden-path/slo/generate.sh "charts/$name"
+golden-path/slo/generate.sh "charts/$name" >/dev/null   # its alerts, for the new name
 
 cat <<EOF
 
-$name is on the golden path. Next:
-  1. Put your code in services/$name/ (or keep the starter to try the path first).
-  2. Set the SLO in charts/$name/slo.yaml, then: golden-path/slo/generate.sh charts/$name
-  3. Fill in services/$name/runbooks/slo-burn.md.
-  4. Push: .github/workflows/$name.yml checks, builds, publishes and deploys it.
-     Or install it yourself (needs the platform: see golden-path/README.md):
-       helm install $name charts/$name --dependency-update -n $name --create-namespace --wait
+Created $name (team $team), a copy of golden-path/new-service:
+  services/$name/                 the app, its Dockerfile and its runbook
+  charts/$name/                   its chart and SLO, with the alerts generated
+  .github/workflows/$name.yml     its pipeline
+Its image will be $registry/$name.
+
+Next:
+  1. Check it:       golden-path/pipeline/checks.sh $name
+  2. Your code:      services/$name/app/   (the starter works as it is)
+  3. Your SLO:       charts/$name/slo.yaml, then: golden-path/slo/generate.sh charts/$name
+  4. Your runbook:   services/$name/runbooks/slo-burn.md
+  5. Deploy:         push to main. The first time, run its workflow by hand with the label first-deploy.
 EOF

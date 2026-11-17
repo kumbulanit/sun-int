@@ -14,6 +14,7 @@ The Storefront team's order validation API, ready for the next big sales weekend
 | Understand the service: its API, answers, settings, how it copes with slow pricing | [services/order-validation/README.md](services/order-validation/README.md) |
 | Make pricing misbehave | [tools/pricing-fake/README.md](tools/pricing-fake/README.md) |
 | Put a new service on the golden path | [golden-path/README.md](golden-path/README.md) |
+| Start a service by copying a working example | [golden-path/new-service/README.md](golden-path/new-service/README.md) |
 
 ```
 golden-path/                  the kit: the shared chart, the platform chart, new-service.sh, SLO as code,
