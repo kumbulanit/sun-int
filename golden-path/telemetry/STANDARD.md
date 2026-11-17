@@ -23,7 +23,7 @@ The golden-path chart sets these for every service (unless you set `telemetry.en
    OTEL_PYTHON_EXCLUDED_URLS: "healthz,readyz"       # no telemetry for health checks
    OTEL_PYTHON_FASTAPI_EXCLUDE_SPANS: "receive,send" # skip tiny internal spans nobody reads
    ```
-4. **Check it arrived:** send some requests, wait 30 s, then `golden-path/tools/prom.sh names http_server` and open Jaeger (`kubectl -n platform port-forward svc/jaeger 16686`).
+4. **Check it arrived:** send some requests, wait 30 s, then `golden-path/tools/prom.sh names http_server` and open Jaeger (`scripts/ui.sh`, or `kubectl -n platform port-forward svc/jaeger 16686`).
 
 That gives you request rate, errors and latency (**your SLI comes from this**), a trace for every request across HTTP calls and database queries, and a `trace_id` on log lines. Other languages: the same chart settings, plus that language's OpenTelemetry auto-instrumentation agent.
 

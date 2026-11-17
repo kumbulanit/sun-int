@@ -17,8 +17,9 @@ The Storefront team's order validation API, ready for the next big sales weekend
 | Start a service by copying a working example | [golden-path/new-service/README.md](golden-path/new-service/README.md) |
 
 ```
-golden-path/                  the kit: the shared chart, the platform chart, new-service.sh, SLO as code,
-                              the telemetry standard, the runbook template, the pipeline's scripts, tools
+golden-path/                  the kit: the shared chart, the platform chart, a new-service example and
+                              new-service.sh, SLO as code, the telemetry standard, the runbook template,
+                              the pipeline's scripts, tools
 charts/order-validation/      the API's chart, on the golden path; its dependencies:
 charts/pricing-fake/            the fake pricing service
 charts/postgres/                the database, with the schema and seed
@@ -30,6 +31,20 @@ load/, scripts/               the k6 load test; scripts to test, open the UIs, l
 
 ## Run it (any Kubernetes cluster)
 You need `helm` and a cluster that `kubectl` points at. No cluster? `k3d cluster create sun-int`, `minikube start -p sun-int` or `kind create cluster --name sun-int`.
+
+**0. The images.** The pipeline publishes them to `ghcr.io` when you push to `main`. Until then, build them and load them into your cluster (k3d shown; minikube: `minikube image load`, kind: `kind load docker-image`):
+```bash
+docker build -t ghcr.io/kumbulanit/order-validation:0.1.0 services/order-validation
+```
+```bash
+docker build -t ghcr.io/kumbulanit/order-validation-tests:0.1.0 --target test services/order-validation
+```
+```bash
+docker build -t ghcr.io/kumbulanit/pricing-fake:0.1.0 tools/pricing-fake
+```
+```bash
+k3d image import ghcr.io/kumbulanit/order-validation:0.1.0 ghcr.io/kumbulanit/order-validation-tests:0.1.0 ghcr.io/kumbulanit/pricing-fake:0.1.0 -c sun-int
+```
 
 **1. The platform,** once per cluster: the OpenTelemetry collector, Prometheus, Alertmanager and Jaeger.
 ```bash
@@ -51,7 +66,7 @@ scripts/test.sh
 scripts/ui.sh
 ```
 
-Nothing is built on your machine: the images come from `ghcr.io`, published by the pipeline.
+Once the images are published, step 0 isn't needed: the cluster pulls them from `ghcr.io`.
 
 `--dependency-update` reads every Helm repository you have registered, and a broken entry in `helm repo list` stops it. Remove that entry (`helm repo remove <name>`) and run it again.
 
@@ -95,19 +110,10 @@ Pricing's p99 jumps to several seconds for 5 minutes: 20% of its calls take 2–
 
 The two drills together failed 12,088 validations (k6's count): about a quarter of the 49,728 a 28-day window allows.
 
-**Run it yourself** (under `scripts/load.sh steady 30m` in another terminal):
-1. Switch the fallback off:
-   ```bash
-   helm upgrade order-validation charts/order-validation -n order-validation --reuse-values --set-string env.PRICING_FALLBACK_ENABLED=false --wait
-   ```
-2. Run the drill. It writes a timeline of the alerts and the error ratio.
-   ```bash
-   scripts/drill.sh A-fallback-off
-   ```
-3. Switch the fallback back on (the same command with `=true`), then run `scripts/drill.sh B-fallback-on`.
+**Run it yourself:** step by step in [scripts/README.md](scripts/README.md#6-the-incident-drill).
 
 ## A new team on the golden path
-`golden-path/new-service.sh payments --team checkout` creates a service that's ready to deploy, then the guide takes over. When we did it:
+`golden-path/new-service.sh payments --team checkout` creates a service that's ready to deploy. Or copy the example in `golden-path/new-service/` by hand and change three names. Then the [guide](golden-path/README.md) takes over. When we did it:
 - the new service's alerts were loaded into Prometheus seconds after its install
 - its metrics and traces arrived, with no telemetry code
 - nothing was done to the platform

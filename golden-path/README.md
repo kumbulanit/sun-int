@@ -10,10 +10,10 @@ Templates for running a service on Kubernetes the same safe way every time. You 
 
 | Template | How you use it |
 |---|---|
-| `charts/service/`: the Deployment, Service, health checks, security, telemetry and alerts | **Referenced:** your chart lists it as a dependency and includes it in one line |
+| `golden-path/charts/service/`: the Deployment, Service, health checks, security, telemetry and alerts | **Referenced:** your chart lists it as a dependency and includes it in one line |
 | `.github/workflows/golden-path.yml`: checks, tests, scan, publish, deploy with rollback | **Referenced:** your pipeline file calls it |
-| `charts/platform/`: Prometheus, Alertmanager, Jaeger, the telemetry collector | **Installed once** per cluster |
-| `new-service/`: a complete, working example service | **Copied:** the starting point for your service. You change three names |
+| `golden-path/charts/platform/`: Prometheus, Alertmanager, Jaeger, the telemetry collector | **Installed once** per cluster |
+| `golden-path/new-service/`: a complete, working example service | **Copied:** the starting point for your service. You change three names |
 
 Referenced templates stay with the platform team. When they improve one, you pick it up by bumping a version number, with no copying.
 

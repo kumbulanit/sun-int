@@ -12,7 +12,7 @@ Run every command from the top of the repository.
 | [The incident drill](#6-the-incident-drill) | the right alert fires when pricing gets slow | the app, the platform, load | `scripts/drill.sh` | 15 min per run |
 
 ## Before the cluster tests
-Install the platform and the app (steps 1 and 2 of the main [README](../README.md)):
+Install the platform and the app (steps 0 to 2 of the main [README](../README.md#run-it-any-kubernetes-cluster); step 0 builds the images while they aren't published yet):
 ```bash
 helm install platform golden-path/charts/platform -n platform --create-namespace --wait
 ```
@@ -117,7 +117,11 @@ This makes pricing slow (20% of its calls take 2–5 s, for 5 minutes) and recor
    ```bash
    helm upgrade order-validation charts/order-validation -n order-validation --reuse-values --set-string env.PRICING_FALLBACK_ENABLED=true --wait
    ```
-   Then wait until run A's alerts have cleared.
+   Then wait until run A's alerts have cleared: up to 30 minutes. Or start Prometheus afresh (it keeps its data in memory):
+   ```bash
+   kubectl -n platform rollout restart deploy/prometheus
+   ```
+   For the next hour, a fresh Prometheus pages more easily, because its long alert windows hold only a few minutes of data.
 5. **Run the drill again:**
    ```bash
    scripts/drill.sh B-fallback-on

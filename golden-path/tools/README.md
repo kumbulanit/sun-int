@@ -13,6 +13,6 @@ Prints your error budget (in requests and minutes), the burn-rate alert threshol
     golden-path/tools/prom.sh names http_server
     golden-path/tools/prom.sh series <your-service>
 
-Asks the platform's Prometheus for real metric names, labels, series counts (against the 2,000-series budget), loaded rules and firing alerts. Run it with no arguments to see every command. Open Prometheus first, in another terminal:
+Asks the platform's Prometheus for real metric names, labels, series counts (against the 2,000-series budget), loaded rules and firing alerts. Run it with no arguments to see every command. Open Prometheus first, in another terminal, with `scripts/ui.sh` or:
 
     kubectl -n platform port-forward svc/prometheus 9090

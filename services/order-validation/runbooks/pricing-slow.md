@@ -26,8 +26,8 @@ Pricing answers slowly or not at all. We give up on a pricing call after **150 m
 
 ## Mitigate (stop the harm, no code change)
 1. **Fallback switched off?** Switch it on: change `PRICING_FALLBACK_ENABLED` to `"true"` under `env` in `charts/order-validation/values.yaml` and deploy with the label `reliability-fix` (locally: `helm upgrade order-validation charts/order-validation -n order-validation --reuse-values --set-string env.PRICING_FALLBACK_ENABLED=true --wait`). **Worked if:** answers show `"price_source": "cache"`, 503s stop, and the page clears within about 5 minutes.
-2. **Pricing down for over a minute (503s because the cache is too old)?** Page the pricing team now. Only if the product owner agrees to older prices (checkout re-prices; assumption 3), raise `PRICING_CACHE_TTL_S` (e.g. to `300`), and **never around 15:00 on Saturday**, when sale prices start. **Worked if:** 503s stop.
-3. **During the flash sale:** tell the Storefront lead. Every minute at 600 req/s costs about 7× the budget of a normal minute.
+2. **Pricing down for over a minute (503s because the cache is too old)?** Page the pricing team now. Only if the product owner agrees to older prices (checkout prices the order again anyway), and **never around 15:00 on Saturday**, when sale prices start: let prices be up to 5 minutes old (`helm upgrade order-validation charts/order-validation -n order-validation --reuse-values --set-string env.PRICING_CACHE_TTL_S=300 --wait`). **Worked if:** 503s stop.
+3. **During the flash sale:** tell the Storefront lead. A bad minute at 600 req/s costs 15× the budget of the same minute at 40 req/s.
 
 ## Fix (the cause)
 - **The pricing team** finds why pricing is slow: their latency, a recent deploy, their own dependencies.

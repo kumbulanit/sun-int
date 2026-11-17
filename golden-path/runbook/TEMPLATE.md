@@ -1,6 +1,6 @@
 # Runbook: <one failure> (<service>)
 
-**One failure, one page.** If it doesn't fit, it covers more than one failure: split it. `new-service.sh` starts you with a copy in `services/<service>/runbooks/`. For another failure, copy it to `services/<service>/runbooks/<failure>.md` and point the alerts' `runbook` (in `charts/<service>/slo.yaml`) at it.
+**One failure, one page.** If it doesn't fit, it covers more than one failure: split it. A new service starts with a filled-in example, `services/<service>/runbooks/slo-burn.md`: rewrite it for your service. For another failure, copy this template to `services/<service>/runbooks/<failure>.md` and point the alerts' `runbook` (in `charts/<service>/slo.yaml`) at it.
 
 | | |
 |---|---|

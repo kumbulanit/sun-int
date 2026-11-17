@@ -41,6 +41,26 @@ Prices are in cents. In the test data, a product costs its SKU number × 100, so
 
 The runbook for this failure: [runbooks/pricing-slow.md](runbooks/pricing-slow.md).
 
+## Its SLO and alerts
+**99.95% of validations are good** over a rolling 28 days. Good means not a `5xx`, and answered within 250 ms. That's 1 in 2,000 that may fail or be slow.
+
+| Alert | Kind | Fires when |
+|---|---|---|
+| `SLOFastBurn` | page | 2% of the 28-day budget would go in an hour |
+| `SLOSlowBurn` | page | 5% would go in 6 hours |
+| `SLOBudgetLeak` | ticket | 10% would go in 3 days |
+| `DependencyFailing` | ticket | more than 5% of pricing calls fail or time out |
+
+The SLO is [charts/order-validation/slo.yaml](../../charts/order-validation/slo.yaml). The alerts are generated from it, and load into Prometheus with the service.
+
+## Its chart
+[charts/order-validation/](../../charts/order-validation/) is on the golden path:
+- **One line** includes the shared golden-path chart: the Deployment, Service, health checks, security, telemetry and alerts.
+- **Its own Secret** holds the database address and the pricing token.
+- **Its `helm test` pod** runs all 40 tests.
+- **Its dependencies:** the pricing service and Postgres are listed in its `Chart.yaml`, so one install brings all three.
+- **Startup:** its pods wait for the database before starting, but not for pricing.
+
 ## Settings
 Set by its chart ([charts/order-validation/values.yaml](../../charts/order-validation/values.yaml)). The API refuses to start, with a clear message, if a required one is missing or wrong.
 
@@ -70,8 +90,6 @@ Set by its chart ([charts/order-validation/values.yaml](../../charts/order-valid
 | `tests/` | 40 tests: 16 for the rules, 16 for the pricing client, 8 end-to-end against the running services |
 | `Dockerfile` | two images: the service, and its tests (`--target test`) |
 | `runbooks/` | what to do when its alerts fire |
-
-Its chart, SLO and alerts are in [charts/order-validation/](../../charts/order-validation/).
 
 ## Run it
 Follow the steps in the main [README](../../README.md): install the platform, then this service with its chart, then `scripts/test.sh`.
