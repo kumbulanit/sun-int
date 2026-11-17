@@ -1,0 +1,13 @@
+order-validation {{ include "order-validation.tag" . }} is installed in {{ .Release.Namespace }}
+{{- if index .Values "pricing-fake" "enabled" }}, with pricing-fake{{ end }}
+{{- if .Values.postgres.enabled }} and postgres{{ end }}.
+
+Run all 40 tests in the cluster:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }} --logs
+
+Call it from this machine (leave it running in another terminal):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/order-validation 8080:8080
+{{- if .Values.global.postgresPassword | eq "local-dev-only" }}
+
+Note: it uses the local-only passwords. On a real cluster, set global.postgresPassword and global.pricingToken.
+{{- end }}

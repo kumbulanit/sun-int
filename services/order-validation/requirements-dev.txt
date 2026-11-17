@@ -1,0 +1,5 @@
+# Test-only libraries. Kept out of the production image: smaller image,
+# fewer packages for the security scan to flag.
+-r requirements.txt
+pytest==9.2.0          # test runner
+pytest-asyncio==1.4.1  # lets pytest run async tests (our DB and HTTP code is async)

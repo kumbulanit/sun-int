@@ -1,0 +1,9 @@
+{{- /* The schema and seed from initdb/. Postgres runs them on its first start only, in name order. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-initdb
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+data:
+  {{- (.Files.Glob "initdb/*.sql").AsConfig | nindent 2 }}

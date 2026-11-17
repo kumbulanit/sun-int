@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pricing-fake
+description: A fake pricing service with a switch to misbehave (slow, failing, refusing the token), to rehearse incidents.
+type: application
+version: 0.1.0        # this chart's version: bump it when the chart changes
+appVersion: "0.1.0"   # the image version: bump it when tools/pricing-fake changes, and CI publishes it

@@ -1,0 +1,14 @@
+{{- /* The database's address inside the cluster: postgres:5432. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

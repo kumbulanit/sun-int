@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# The database files go into the Postgres container, and the deploy values into
+# Helm: neither belongs in this image.
+db/
+deploy/

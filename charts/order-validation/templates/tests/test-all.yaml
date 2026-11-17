@@ -1,0 +1,38 @@
+{{- /* `helm test order-validation`: all 40 tests (unit + end-to-end) as a pod in the
+       cluster, so they reach the services by name. A passing pod is deleted (`--logs` has
+       printed its output by then); a failing one is kept to look at, until the next run. */}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-validation-tests
+  labels:
+    {{- include "order-validation.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: tests
+      image: "{{ .Values.tests.image.repository }}:{{ include "order-validation.tag" . }}"
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      env:
+        - name: API_URL
+          value: http://order-validation:8080
+        - name: PRICING_URL
+          value: {{ .Values.pricing.url | quote }}
+      resources:
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {memory: 256Mi}
+      securityContext:
+        {{- include "order-validation.containerSecurity" . | nindent 8 }}
+      volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - name: tmp
+      emptyDir: {}

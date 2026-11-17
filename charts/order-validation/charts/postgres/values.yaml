@@ -1,0 +1,17 @@
+# The database for trying order-validation out. Its data lives in the pod, so a restart
+# starts again from the seed (initdb/). For anything real, use a managed database and
+# switch this chart off: postgres.enabled=false in the order-validation chart.
+
+image:
+  repository: postgres      # the official image, from Docker Hub
+  tag: 18.7-alpine
+
+database: order_validation
+user: order_validation
+
+global:
+  postgresPassword: local-dev-only   # local only. The order-validation chart sets it for both ends.
+
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {memory: 512Mi}

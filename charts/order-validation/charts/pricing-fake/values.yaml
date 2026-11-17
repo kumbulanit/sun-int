@@ -1,0 +1,18 @@
+# The fake pricing service. Its switch, POST /admin/mode, makes it slow, failing or
+# refusing the token, to rehearse incidents.
+
+image:
+  repository: ghcr.io/kumbulanit/pricing-fake   # built and published by .github/workflows/images.yml
+  tag: ""                                        # empty = the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# One pod only: the misbehave switch lives in the pod's memory, so with two pods
+# a switch would reach only one of them.
+replicas: 1
+
+global:
+  pricingToken: local-dev-token   # local only. The order-validation chart sets it for both ends.
+
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 128Mi}
